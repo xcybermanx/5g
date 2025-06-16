@@ -19,7 +19,6 @@ interface Dongle {
   signalStrength: string
   ipAddress: string
   networkName: string
-  // New fields from the local server script
   interface: string
   inetIp: string
   port: string
@@ -29,10 +28,9 @@ interface Dongle {
 
 export function DongleManagementPanel() {
   const [dongles, setDongles] = useState<Dongle[]>([])
-  const [isLoading, setIsLoading] = useState(true) // Manage loading state for dongle data
+  const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
-  // Action for switching dongle mode (from previous step)
   const [modeState, switchModeAction, isModePending] = useActionState(async (prevState: any, formData: FormData) => {
     const mode = Number.parseInt(formData.get("mode") as string)
     const result = await switchDongleMode(mode)
@@ -44,7 +42,6 @@ export function DongleManagementPanel() {
     return result
   }, null)
 
-  // Action for triggering IP change
   const [ipChangeState, ipChangeAction, isIpChangePending] = useActionState(
     async (prevState: any, formData: FormData) => {
       const ip = formData.get("ip") as string
@@ -55,7 +52,9 @@ export function DongleManagementPanel() {
         variant: result.success ? "default" : "destructive",
       })
       // Refresh dongle list after IP change attempt
-      fetchDongleDevices()
+      if (result.success) {
+        fetchDongleDevices()
+      }
       return result
     },
     null,
@@ -63,30 +62,39 @@ export function DongleManagementPanel() {
 
   const fetchDongleDevices = async () => {
     setIsLoading(true)
-    const devices = await getConnectedDongleDevices()
-    // Map the fetched devices to your Dongle interface, adding placeholders for missing fields
-    const mappedDevices: Dongle[] = devices.map((device, index) => ({
-      id: device.ip, // Using IP as ID for uniqueness
-      name: `Dongle-${index + 1}`,
-      status: device.active === 1 ? "online" : "offline",
-      signalStrength: "N/A", // This would need to be fetched separately if available
-      ipAddress: device.ip,
-      networkName: "N/A", // This would need to be fetched separately if available
-      interface: device.interface,
-      inetIp: device.inetIp,
-      port: device.port,
-      active: device.active,
-      publicIp: device.publicIp,
-    }))
-    setDongles(mappedDevices)
-    setIsLoading(false)
+    try {
+      const devices = await getConnectedDongleDevices()
+      const mappedDevices: Dongle[] = devices.map((device, index) => ({
+        id: device.ip,
+        name: `Dongle-${index + 1}`,
+        status: device.active === 1 ? "online" : "offline",
+        signalStrength: "N/A",
+        ipAddress: device.ip,
+        networkName: "N/A",
+        interface: device.interface,
+        inetIp: device.inetIp,
+        port: device.port,
+        active: device.active,
+        publicIp: device.publicIp,
+      }))
+      setDongles(mappedDevices)
+    } catch (error) {
+      console.error("Error in fetchDongleDevices:", error)
+      toast({
+        title: "Connection Error",
+        description: error instanceof Error ? error.message : "An unknown error occurred while fetching dongle data.",
+        variant: "destructive",
+      })
+      setDongles([]) // Clear dongles on error
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   useEffect(() => {
     fetchDongleDevices()
-    // Set up an interval to refresh dongle data periodically
-    const interval = setInterval(fetchDongleDevices, 5000) // Refresh every 5 seconds
-    return () => clearInterval(interval) // Clean up on unmount
+    const interval = setInterval(fetchDongleDevices, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   return (
@@ -139,7 +147,7 @@ export function DongleManagementPanel() {
               ) : dongles.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-4">
-                    No dongles found. Ensure your local server is running and accessible.
+                    No dongles found. Ensure your local server is running and accessible at the configured URL.
                   </TableCell>
                 </TableRow>
               ) : (

@@ -22,15 +22,21 @@ export async function getConnectedDongleDevices(): Promise<DongleDevice[]> {
     })
 
     if (!response.ok) {
-      console.error(`Failed to fetch devices: ${response.status} ${response.statusText}`)
-      return []
+      const errorBody = await response.text()
+      console.error(
+        `Failed to fetch devices from ${LOCAL_DONGLE_SERVER_URL}/devices: HTTP status ${response.status} ${response.statusText}. Response body: ${errorBody}`,
+      )
+      throw new Error(`Server responded with status ${response.status}: ${errorBody || response.statusText}`)
     }
 
     const devices: DongleDevice[] = await response.json()
     return devices
   } catch (error) {
-    console.error("Error fetching connected dongle devices:", error)
-    return []
+    console.error(`Error fetching connected dongle devices from ${LOCAL_DONGLE_SERVER_URL}:`, error)
+    // Re-throw a more user-friendly error for the client component
+    throw new Error(
+      `Could not connect to dongle management server at ${LOCAL_DONGLE_SERVER_URL}. Please ensure it is running and accessible. Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }
 
@@ -56,7 +62,7 @@ export async function triggerIpChange(ip: string) {
     console.error("Error triggering IP change:", error)
     return {
       success: false,
-      message: `Failed to trigger IP change: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Failed to trigger IP change: Could not connect to dongle management server at ${LOCAL_DONGLE_SERVER_URL}. Please ensure it is running and accessible. Error: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }
